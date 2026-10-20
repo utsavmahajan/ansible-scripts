@@ -1,0 +1,17 @@
+---
+- name: NGINX-INGRESS Installation
+  hosts: servers
+
+  tasks:
+    - name: Nginx-Ingress Repo Add
+      ansible.builtin.command: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+
+    - name: Repo Update
+      ansible.builtin.command: helm repo update
+
+    - name: Installing Nginx-Ingress via Helm
+      ansible.builtin.command: >
+        helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx
+        --namespace ingress-nginx
+        --create-namespace
+        --set controller.service.type=NodePort

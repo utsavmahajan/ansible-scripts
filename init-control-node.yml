@@ -1,0 +1,37 @@
+---
+- name: Setup Control Node
+  hosts: servers
+  become: true
+
+  tasks:
+  
+    # Initialize the Kubernetes cluster
+    - name: Initialize the Cluster
+      ansible.builtin.command:
+        argv:
+          - kubeadm
+          - init
+          - "--apiserver-advertise-address={{ ansible_facts['default_ipv4']['address'] }}"
+          - --pod-network-cidr=10.244.0.0/16
+      args:
+        creates: /etc/kubernetes/admin.conf
+
+    # Create .kube directory for ubuntu
+    - name: Create .kube Directory
+      ansible.builtin.file:
+        path: /home/ubuntu/.kube
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755'
+
+    # Copy kubeconfig for ubuntu
+    - name: Copy kubeconfig File
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/ubuntu/.kube/config
+        remote_src: true
+        owner: ubuntu
+        group: ubuntu
+        mode: '0600'
+

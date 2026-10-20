@@ -1,0 +1,24 @@
+---
+- name: Calico CNI Installation
+  hosts: servers
+
+  tasks:
+    - name: Installing Calico Operator
+      ansible.builtin.command: kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.32.2/manifests/v1_crd_projectcalico_org.yaml
+
+    - name: Installing Tigera Operator
+      ansible.builtin.command: kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.32.2/manifests/tigera-operator.yaml
+
+    - name: Download the custom resources necessary to configure Calico.
+      ansible.builtin.shell:
+        cmd: curl -O https://raw.githubusercontent.com/projectcalico/calico/v3.32.2/manifests/custom-resources-bpf.yaml
+
+    - name: Download the custom resources necessary to configure Calico.
+      ansible.builtin.shell:
+        cmd: >-
+          sudo sed -i 's|cidr: 192.168.0.0/16|cidr: 10.244.0.0/16|'
+          "$(pwd)/custom-resources-bpf.yaml"
+
+    - name: Installing Calico Operator
+      ansible.builtin.command: kubectl create -f custom-resources-bpf.yaml
+        

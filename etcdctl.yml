@@ -1,0 +1,17 @@
+- name: ETCDCTL Installation
+  hosts: servers
+  become: true
+
+  tasks:
+
+    # Update apt cache
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    # Install etcdctl packages
+    - name: Install etcdctl packages
+      ansible.builtin.apt:
+        name: etcd-client
+        state: present
+      when: ansible_facts['distribution'] == "Ubuntu"

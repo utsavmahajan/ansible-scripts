@@ -1,0 +1,201 @@
+---
+- name: Setup Control and Worker Node
+  hosts: servers
+  become: true
+
+  vars:
+    packages_to_install:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gpg
+      - wget
+
+    k8_packages:
+      - kubelet
+      - kubeadm
+      - kubectl
+
+    kubernetes_version: "v1.35"
+
+  tasks:
+
+    # Update apt cache
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    # Install prerequisite packages
+    - name: Install prerequisite packages
+      ansible.builtin.apt:
+        name: "{{ packages_to_install }}"
+        state: present
+      when: ansible_facts['distribution'] == "Ubuntu"
+
+    # Install containerd
+    - name: Install containerd
+      ansible.builtin.apt:
+        name: containerd
+        state: present
+
+    # Create containerd configuration directory
+    - name: Ensure containerd configuration directory exists
+      ansible.builtin.file:
+        path: /etc/containerd
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    # Generate default containerd configuration if missing
+    - name: Check whether containerd configuration exists
+      ansible.builtin.stat:
+        path: /etc/containerd/config.toml
+      register: containerd_config_file
+
+    - name: Generate default containerd configuration
+      ansible.builtin.command:
+        cmd: containerd config default
+      register: containerd_default_config
+      when: not containerd_config_file.stat.exists
+      changed_when: not containerd_config_file.stat.exists
+      notify: Restart containerd
+
+    - name: Write default containerd configuration
+      ansible.builtin.copy:
+        dest: /etc/containerd/config.toml
+        content: "{{ containerd_default_config.stdout }}\n"
+        owner: root
+        group: root
+        mode: '0644'
+      when: not containerd_config_file.stat.exists
+      notify: Restart containerd
+
+    # Configure systemd cgroup driver
+    - name: Enable systemd cgroup driver in containerd
+      ansible.builtin.replace:
+        path: /etc/containerd/config.toml
+        regexp: '^(\s*)SystemdCgroup\s*=\s*false\s*$'
+        replace: '\g<1>SystemdCgroup = true'
+      notify: Restart containerd
+
+    # Persist required kernel modules
+    - name: Persist kernel modules across reboots
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/containerd.conf
+        content: |
+          overlay
+          br_netfilter
+        owner: root
+        group: root
+        mode: '0644'
+
+    # Load required kernel modules
+    - name: Load required kernel modules
+      ansible.builtin.command:
+        argv:
+          - modprobe
+          - "{{ item }}"
+      loop:
+        - overlay
+        - br_netfilter
+      changed_when: false
+
+    # Configure Kubernetes networking
+    - name: Configure sysctl parameters
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/kubernetes.conf
+        content: |
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.bridge.bridge-nf-call-iptables = 1
+          net.ipv4.ip_forward = 1
+        owner: root
+        group: root
+        mode: '0644'
+      notify: Apply sysctl settings
+
+    # Apply sysctl settings
+    - name: Apply sysctl settings immediately
+      ansible.builtin.command:
+        cmd: sysctl --system
+      changed_when: false
+
+    # Install prerequisite packages for Kubernetes repository
+    - name: Ensure apt keyrings directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    # Download Kubernetes signing key
+    - name: Download Kubernetes repository signing key
+      ansible.builtin.get_url:
+        url: "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/deb/Release.key"
+        dest: /tmp/kubernetes-release.key
+        owner: root
+        group: root
+        mode: '0644'
+
+# Convert signing key to keyring format
+    - name: Convert Kubernetes signing key to keyring format
+      ansible.builtin.command:
+        argv:
+          - gpg
+          - --dearmor
+          - --yes
+          - --output
+          - /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+          - /tmp/kubernetes-release.key
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+    # Ensure correct permissions for the apt keyring
+    - name: Ensure keyring permissions
+      ansible.builtin.file:
+        path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+        owner: root
+        group: root
+        mode: '0644'
+
+    # Configure Kubernetes apt repository
+    - name: Configure Kubernetes apt repository
+      ansible.builtin.deb822_repository:
+        name: kubernetes
+        types:
+          - deb
+        uris:
+          - "https://pkgs.k8s.io/core:/stable:/{{ kubernetes_version }}/deb/"
+        suites:
+          - /
+        signed_by: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+        state: present
+        enabled: true
+
+    # Install Kubernetes packages
+    - name: Install Kubernetes packages
+      ansible.builtin.apt:
+        name: "{{ k8_packages }}"
+        state: present
+        update_cache: true
+
+    # Enable and start kubelet
+    - name: Enable and start kubelet
+      ansible.builtin.systemd_service:
+        name: kubelet
+        enabled: true
+        state: started
+
+  handlers:
+
+    - name: Restart containerd
+      ansible.builtin.systemd_service:
+        name: containerd
+        state: restarted
+        enabled: true
+
+    - name: Apply sysctl settings
+      ansible.builtin.command:
+        cmd: sysctl --system
+      changed_when: false

@@ -1,0 +1,20 @@
+---
+- name: Cilium CNI Installation
+  hosts: servers
+
+  tasks:
+    - name: Cilium Repo Add
+      ansible.builtin.command: helm repo add cilium https://helm.cilium.io/
+
+    - name: Repo Update
+      ansible.builtin.command: helm repo update
+
+    - name: Installing Cilium via Helm
+      ansible.builtin.command: >
+        helm install cilium cilium/cilium
+        --namespace kube-system
+        --set ipam.operator.clusterPoolIPv4PodCIDRList='{10.244.0.0/16}'
+        --set envoy.enabled=true
+        --set hubble.enabled=false
+        --set hubble.relay.enabled=false
+        --set hubble.ui.enabled=false

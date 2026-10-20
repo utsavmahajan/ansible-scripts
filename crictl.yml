@@ -1,0 +1,17 @@
+- name: CRICTL Installation
+  hosts: servers
+  become: true
+
+  tasks:
+
+    # Update apt cache
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    # Install crictl packages
+    - name: Install crictl packages
+      ansible.builtin.apt:
+        name: cri-tools
+        state: present
+      when: ansible_facts['distribution'] == "Ubuntu"

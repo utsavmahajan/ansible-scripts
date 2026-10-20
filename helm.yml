@@ -1,0 +1,21 @@
+- name: HELM Installation
+  hosts: servers
+  become: true
+
+  tasks:
+    - name: Download and add the Helm GPG signing key
+      ansible.builtin.shell:
+        cmd: curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | tee /usr/share/keyrings/helm.gpg > /dev/null
+
+    - name: Add the official Helm apt repository
+      ansible.builtin.shell:
+        cmd: echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" | tee /etc/apt/sources.list.d/helm-stable-debian.list
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Installing HELM
+      ansible.builtin.apt:
+        name: helm
+        state: present

@@ -1,0 +1,15 @@
+---
+- name: NGINX-GATEWAY Installation
+  hosts: servers
+
+  tasks:
+
+    - name: Download the custom resources necessary to configure Nginx-Gateway.
+      ansible.builtin.shell: kubectl kustomize "https://github.com/nginx/nginx-gateway-fabric/config/crd/gateway-api/standard" | kubectl apply -f -
+
+    - name: Nginx-Gateway Installation
+      ansible.builtin.command: >
+        helm install ngf oci://ghcr.io/nginx/charts/nginx-gateway-fabric
+        --namespace nginx-gateway
+        --create-namespace
+        --set nginx.service.type=NodePort
