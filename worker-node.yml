@@ -1,5 +1,5 @@
 ---
-# Play 1: Run only on the control plane node to generate the token
+# Play 1: Generate the join command on the control plane
 - name: Get Join Command from Control Node
   hosts: control-plane
   become: true
@@ -9,12 +9,12 @@
       register: cmd_result
       changed_when: false
 
-# Play 2: Run on worker nodes (all hosts except 'control-node')
+# Play 2: Run it on the worker
 - name: Run Join Command on Worker Nodes
   hosts: all:!control-plane
   become: true
   tasks:
     - name: Join worker node to cluster
-      ansible.builtin.command: "{{ hostvars['test']['cmd_result']['stdout'] }}"
+      ansible.builtin.command: "{{ hostvars['control-plane']['cmd_result']['stdout'] }}"
       args:
         creates: /etc/kubernetes/kubelet.conf
