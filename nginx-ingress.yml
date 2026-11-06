@@ -3,6 +3,12 @@
   hosts: servers
 
   tasks:
+    - name: Allow scheduling on control-plane (single-node cluster)
+      ansible.builtin.command: kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+      register: taint
+      failed_when: taint.rc != 0 and 'not found' not in taint.stderr
+      changed_when: "'untainted' in taint.stdout"
+      
     - name: Nginx-Ingress Repo Add
       ansible.builtin.command: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 

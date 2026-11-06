@@ -3,6 +3,12 @@
   hosts: servers
 
   tasks:
+    - name: Allow scheduling on control-plane (single-node cluster)
+      ansible.builtin.command: kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+      register: taint
+      failed_when: taint.rc != 0 and 'not found' not in taint.stderr
+      changed_when: "'untainted' in taint.stdout"
+      
     - name: metrics-server Repo Add
       ansible.builtin.command: helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
 
@@ -11,4 +17,6 @@
 
     - name: Install Metric server
       ansible.builtin.command: helm upgrade --install metrics-server metrics-server/metrics-server --namespace kube-system --set args="{--kubelet-insecure-tls=true}"
+
+
       
